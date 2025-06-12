@@ -6,8 +6,7 @@ library(ggplot2)
 library(corrplot)
 library(RColorBrewer)
 
-Data <- read_excel("Data/Combined_Bulk_scRNA_ANMLNormalized.xlsx", sheet = "Spearman") %>% unique()
-colnames(Data)[4] <- "Bulk_Spearman_p-value"
+Data <- read_excel("Combined_Bulk_scRNA_ANMLNormalized.xlsx", sheet = "Spearman")
 Names <- data.frame(ColName = colnames(Data))
 Names <- Names %>% filter(!ColName %in% c("Protein", "Gene")) %>% 
   separate(ColName, into = c("Bulk_Names", "Other"), sep = "_", remove = F)
