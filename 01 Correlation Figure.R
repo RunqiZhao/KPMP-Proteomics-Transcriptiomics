@@ -1,4 +1,3 @@
-library(readxl)
 library(dplyr)
 library(tidyr)
 
@@ -6,8 +5,35 @@ library(ggplot2)
 library(corrplot)
 library(RColorBrewer)
 
-Data <- read_excel("Data/Combined_Bulk_scRNA_ANMLNormalized.xlsx", sheet = "Spearman")
-Names <- data.frame(ColName = colnames(Data))
+# 137 * (ID+14)
+Bulk <- read.csv("bulk_expression_matrix.csv")
+# 137 * (ID+7163)
+Protein <- read.csv("protein_mean_expression.csv")
+
+Cor_Result <- data.frame(Protein = colnames(Data_Protein)[2:7164])
+
+for (i in colnames(Bulk)[2:15]){
+  Data_Bulk <- Bulk[, c("ID", i)]
+  Data_Protein <- filter(Protein, ID %in% Data_Bulk$ID)
+  Cor_Result_Prot <- data.frame(Protein = colnames(Data_Protein)[2:7164], Spearman = NA, p_value = NA)
+  
+  for (j in colnames(Data_Protein)[2:7164]){
+    Data_Bulk <- Data_Bulk[, i]
+    Data_Protein <- Data_Protein[, j]
+    cor_spea <- cor.test(Data_Bulk, Data_Protein, method = "spearman")
+    Cor_Result_Prot$Spearman[which(Cor_Result_Prot$Protein == j)] <- cor_spea$estimate
+    Cor_Result_Prot$p_value[which(Cor_Result_Prot$Protein == j)] <- cor_spea$p.value
+  }
+  
+  colnames(Cor_Result_Prot) <- c("Protein", 
+                                 paste0(i, "_Spearman", sep = ""),
+                                 paste0(i, "_p-value", sep = ""))
+  Cor_Result <- merge(Cor_Result, Cor_Result_Prot, 
+                      by.x = "Protein", by.y = "Protein",
+                      all.x = T, all.y = T)
+}
+
+Names <- data.frame(ColName = colnames(Cor_Result))
 Names <- Names %>% filter(!ColName %in% c("Protein", "Gene")) %>% 
   separate(ColName, into = c("Bulk_Names", "Other"), sep = "_", remove = F)
 Bulk_Names <- unique(Names$Bulk_Names)
@@ -15,7 +41,7 @@ Bulk_Names <- unique(Names$Bulk_Names)
 Protein_Hits <- data.frame(Protein = NA, Gene = NA)
 
 for(Name in Bulk_Names){
-  Data_Name <- select(Data, c("Protein", "Gene", Names$ColName[which(Names$Bulk_Names == Name)]))
+  Data_Name <- select(Cor_Result, c("Protein", "Gene", Names$ColName[which(Names$Bulk_Names == Name)]))
   p_index <- which(grepl("value$", colnames(Data_Name)))
   # hits defined as Spearman p<0.001 with positive correlation
   Sig_Inx <- which(Data_Name[, p_index] < 0.001)
@@ -67,7 +93,7 @@ corrplot(CorFigure_DT$r, p.mat = CorFigure_DT$p,
 dev.off()
 
 # Present Other Coefficients
-Protein_Hits_Other <- filter(Data, Protein %in% Protein_Hits$Protein) %>% as.data.frame()
+Protein_Hits_Other <- filter(Cor_Result, Protein %in% Protein_Hits$Protein) %>% as.data.frame()
 Protein_Hits_Other %>% writexl::write_xlsx("Output/Cor_Show_all.05.28.2025.xlsx")
 
 row.names(Protein_Hits_Other) <- Protein_Hits_Other$Gene
